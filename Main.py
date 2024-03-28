@@ -104,17 +104,16 @@ attributeNames[3] = "Oral"
 attributeNames[4] = "Insulin Levels"
 
 
-N, M = X.shape
-
 C = len(classNames)
 
 if X.dtype != float:
     X = X.astype(float)
 
-# Since our data has very different scales we will standardize
-# Subtract mean value from data
-Y = X - np.ones((N, 1)) * X.mean(axis=0)
 
-# Divide by the standard deviation 
-Y = Y * (1 / np.std(Y, 0))
+# Taking my age-attribute that I want to predict
+y = X[:, 4].reshape(-1, 1)
+
+# Removing the age-attribute from the features
+X = np.delete(X, 4, axis=1)
+
 
