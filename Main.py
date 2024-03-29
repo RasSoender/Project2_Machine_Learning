@@ -117,3 +117,21 @@ y = X[:, 4].reshape(-1, 1)
 X = np.delete(X, 4, axis=1)
 
 
+import matplotlib.pyplot as plt
+
+attributeNames = ["Age", "BMI", "Blood Glucose", "Oral", "Male", "Female", "Active", "Not Active", "Diabetic", "Not Diabetic", "Borderline Diabetic"]
+coefficient = [-2.39, 5.36, 0.3, 1.5, 0.25, -0.25, -0.18, 0.18, -0.17, -0.18, 0.32]
+
+
+def PCA_directions():
+    plt.figure(figsize=(10, 6))
+    colors = ['red' if coef < 0 else 'blue' for coef in coefficient]
+    plt.bar(attributeNames, coefficient, color=colors)
+    plt.title('Coefficients of Attributes')
+    plt.xlabel('Attributes')
+    plt.ylabel('Coefficients')
+    plt.xticks(rotation=70, ha='right')
+    plt.tight_layout()
+    plt.show()
+
+PCA_directions()
