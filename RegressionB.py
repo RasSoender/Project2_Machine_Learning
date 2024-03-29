@@ -10,6 +10,7 @@ def baseline_error(baseline, y_test):
     return error
 
 def train_ANN(hidden):
+    errors = []
     for h in hidden: 
         model = lambda: torch.nn.Sequential(
             torch.nn.Linear(M, h),  # M features to n_hidden_units
@@ -26,7 +27,7 @@ def train_ANN(hidden):
         max_iter = 1000
         n_replicates = 1
         # Train the net on training data
-        net, final_loss, learning_curve = train_neural_net(
+        net, _, _ = train_neural_net(
             model,
             loss_fn,
             X=X_train,
@@ -34,8 +35,17 @@ def train_ANN(hidden):
             n_replicates=n_replicates,
             max_iter=max_iter,
         )
-        
+        # Determine estimated class labels for test set
+        y_test_est = net(X_test)
 
+        # Determine errors and errors
+        se = (y_test_est.float() - y_test.float()) ** 2  # squared error
+        mse = (sum(se).type(torch.float) / len(y_test)).data.numpy()  # mean
+        errors.append(mse)
+    min_error = min(errors)
+    h = errors.index(min_error)
+
+    return h, min_error
 
 def train_regression(X_train, y_train, X_test, y_test):
     """
@@ -117,11 +127,12 @@ for train_index, test_index in CV.split(X, y):
     X_test = X[test_index]
     y_test = y[test_index]
     
-    train_ANN(hidden)
+    #h, E_ann = train_ANN(hidden)
     opt_lamb, E_lamb = train_regression(X_train, y_train, X_test, y_test)
     E_baseline = baseline_error(baseline, y_test)
 
     print(f"Fold Nr. {k}")
+    #print(f"h = {h}, error = {E_ann}")
     print(f"lamb = {opt_lamb}, error = {E_lamb}")
     print(f"baseline = {E_baseline}")
 
