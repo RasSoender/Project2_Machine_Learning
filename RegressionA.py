@@ -29,6 +29,10 @@ attributeNames = ["Offset"] + attributeNames.tolist()
 M = M + 1
 
 
+print(attributeNames)
+print(X)
+print(y)
+
 ## Crossvalidation
 # Create crossvalidation partition for evaluation
 K = 10

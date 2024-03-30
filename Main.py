@@ -110,10 +110,10 @@ if X.dtype != float:
     X = X.astype(float)
 
 
-# Taking my age-attribute that I want to predict
+# Taking my insulin level attribute that I want to predict
 y = X[:, 4].reshape(-1, 1)
 
-# Removing the age-attribute from the features
+# Removing the insulin level attribute from the features
 X = np.delete(X, 4, axis=1)
 
 

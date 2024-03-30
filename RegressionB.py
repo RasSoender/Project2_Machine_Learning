@@ -9,7 +9,9 @@ def baseline_error(baseline, y_test):
     )
     return error
 
-def train_ANN(hidden):
+def train_ANN(hidden, y):
+    y = y.reshape(-1, 1)
+
     errors = []
     for h in hidden: 
         model = lambda: torch.nn.Sequential(
@@ -127,12 +129,12 @@ for train_index, test_index in CV.split(X, y):
     X_test = X[test_index]
     y_test = y[test_index]
     
-    #h, E_ann = train_ANN(hidden)
+    h, E_ann = train_ANN(hidden, y)
     opt_lamb, E_lamb = train_regression(X_train, y_train, X_test, y_test)
     E_baseline = baseline_error(baseline, y_test)
 
     print(f"Fold Nr. {k}")
-    #print(f"h = {h}, error = {E_ann}")
+    print(f"h = {h}, error = {E_ann}")
     print(f"lamb = {opt_lamb}, error = {E_lamb}")
     print(f"baseline = {E_baseline}")
 
