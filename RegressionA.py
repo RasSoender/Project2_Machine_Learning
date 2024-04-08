@@ -22,16 +22,11 @@ N, M = X.shape
 
 y = y.squeeze()
 # Add offset attribute
-X = np.concatenate((np.ones((X.shape[0], 1)), X), 1)
 
-attributeNames = np.concatenate((attributeNames[:4], attributeNames[5:]), axis=0)
-attributeNames = ["Offset"] + attributeNames.tolist()
+attributeNames = ["Offset"] + attributeNames
 M = M + 1
 
 
-print(attributeNames)
-print(X)
-print(y)
 
 ## Crossvalidation
 # Create crossvalidation partition for evaluation

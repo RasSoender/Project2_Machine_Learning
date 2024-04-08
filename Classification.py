@@ -1,68 +1,78 @@
 from MainClassification import *
-import importlib_resources
-import numpy as np
-import sklearn.linear_model as lm
-from matplotlib.pylab import (
-    figure,
-    grid,
-    legend,
-    loglog,
-    semilogx,
-    show,
-    subplot,
-    title,
-    xlabel,
-    ylabel,
-)
+import torch
+from sklearn.model_selection import KFold
 from sklearn import model_selection
+from dtuimldmtools import rlr_validate, train_neural_net
 
-from dtuimldmtools import rlr_validate
+def baseline_error(baseline, y_test):
+    error = 0
+    numb_0 = np.count_nonzero(baseline == 0)
+    numb_1 = np.count_nonzero(baseline == 1)
+    print(numb_0)
+    print(numb_1)
+    class_predict = max(numb_0, numb_1)
+    for i in y_test:
+        if i != class_predict:
+            error += 1
+    print(y_test.shape[0])
+    print(error/y_test.shape[0])
+    return error/y_test.shape[0]
 
-N, M = X.shape
+def train_ANN(hidden, y, train_index, test_index):
+    y = y.reshape(-1, 1)
+    errors = []
+    for h in hidden: 
+        model = lambda: torch.nn.Sequential(
+            torch.nn.Linear(M, h),  # M features to n_hidden_units
+            torch.nn.ReLU(),  # 1st transfer function,
+            torch.nn.Linear(h, 1),  # n_hidden_units to 1 output neuron
+            torch.nn.Sigmoid()  # Sigmoid activation for binary classification
+        )
+        loss_fn = torch.nn.BCELoss()  # Binary Cross-Entropy Loss
+        # Extract training and test set for current CV fold, convert to tensors
+        X_train = torch.Tensor(X[train_index, :])
+        y_train = torch.Tensor(y[train_index])
+        X_test = torch.Tensor(X[test_index, :])
+        y_test = torch.Tensor(y[test_index])
+        max_iter = 10000
+        n_replicates = 1
+        # Train the net on training data
+        net, _, _ = train_neural_net(
+            model,
+            loss_fn,
+            X=X_train,
+            y=y_train,
+            n_replicates=n_replicates,
+            max_iter=max_iter,
+        )
+        # Determine estimated class labels for test set
+        y_test_est = (net(X_test) > 0.5).float()  # Threshold at 0.5 for binary classification
 
-y = y.squeeze()
-# Add offset attribute
-X = np.concatenate((np.ones((X.shape[0], 1)), X), 1)
+        # Determine accuracy as the evaluation metric
+        accuracy = (y_test_est == y_test).float().mean().data.numpy()
+        errors.append(1 - accuracy)  # Error is 1 - accuracy for binary classification
+    min_error = min(errors)
+    h = errors.index(min_error)
 
-attributeNames = np.concatenate((attributeNames[:4], attributeNames[5:]), axis=0)
-attributeNames = ["Offset"] + attributeNames.tolist()
-M = M + 1
+    return h, min_error
 
 
-print(attributeNames)
-print(X)
-print(y)
+def train_regression(lambdas, X_train, y_train, X_test, y_test):
+    """
+    training and testing the model for linear regression
+    """
+    k = 0
 
-## Crossvalidation
-# Create crossvalidation partition for evaluation
-K = 10
-CV = model_selection.KFold(K, shuffle=True)
-# CV = model_selection.KFold(K, shuffle=False)
-
-# Values of lambda
-lambdas = np.power(10.0, range(-10, 9))
-
-# Initialize variables
-# T = len(lambdas)
-Error_train = np.empty((K, 1))
-Error_test = np.empty((K, 1))
-Error_train_rlr = np.empty((K, 1))
-Error_test_rlr = np.empty((K, 1))
-Error_train_nofeatures = np.empty((K, 1))
-Error_test_nofeatures = np.empty((K, 1))
-w_rlr = np.empty((M, K))
-mu = np.empty((K, M - 1))
-sigma = np.empty((K, M - 1))
-w_noreg = np.empty((M, K))
-
-k = 0
-for train_index, test_index in CV.split(X, y):
-    # extract training and test set for current CV fold
-    X_train = X[train_index]
-    y_train = y[train_index]
-    X_test = X[test_index]
-    y_test = y[test_index]
-    internal_cross_validation = 10
+    Error_train = np.empty((K, 1))
+    Error_test = np.empty((K, 1))
+    Error_train_rlr = np.empty((K, 1))
+    Error_test_rlr = np.empty((K, 1))
+    Error_train_nofeatures = np.empty((K, 1))
+    Error_test_nofeatures = np.empty((K, 1))
+    w_rlr = np.empty((M, K))
+    mu = np.empty((K, M - 1))
+    sigma = np.empty((K, M - 1))
+    w_noreg = np.empty((M, K))
 
     (
         opt_val_err,
@@ -70,7 +80,7 @@ for train_index, test_index in CV.split(X, y):
         mean_w_vs_lambda,
         train_err_vs_lambda,
         test_err_vs_lambda,
-    ) = rlr_validate(X_train, y_train, lambdas, internal_cross_validation)
+    ) = rlr_validate(X_train, y_train, lambdas, K2)
 
     # Standardize outer fold based on training set, and save the mean and standard
     # deviations since they're part of the model (they would be needed for
@@ -84,103 +94,90 @@ for train_index, test_index in CV.split(X, y):
     Xty = X_train.T @ y_train
     XtX = X_train.T @ X_train
 
-    # Compute mean squared error without using the input data at all
-    Error_train_nofeatures[k] = (
-        np.square(y_train - y_train.mean()).sum(axis=0) / y_train.shape[0]
-    )
-    Error_test_nofeatures[k] = (
-        np.square(y_test - y_test.mean()).sum(axis=0) / y_test.shape[0]
-    )
-
     # Estimate weights for the optimal value of lambda, on entire training set
     lambdaI = opt_lambda * np.eye(M)
     lambdaI[0, 0] = 0  # Do no regularize the bias term
     w_rlr[:, k] = np.linalg.solve(XtX + lambdaI, Xty).squeeze()
     # Compute mean squared error with regularization with optimal lambda
-    Error_train_rlr[k] = (
-        np.square(y_train - X_train @ w_rlr[:, k]).sum(axis=0) / y_train.shape[0]
-    )
-    Error_test_rlr[k] = (
+    error = (
         np.square(y_test - X_test @ w_rlr[:, k]).sum(axis=0) / y_test.shape[0]
     )
+    return opt_lambda, error
 
-    # Estimate weights for unregularized linear regression, on entire training set
-    w_noreg[:, k] = np.linalg.solve(XtX, Xty).squeeze()
-    # Compute mean squared error without regularization
-    Error_train[k] = (
-        np.square(y_train - X_train @ w_noreg[:, k]).sum(axis=0) / y_train.shape[0]
-    )
-    Error_test[k] = (
-        np.square(y_test - X_test @ w_noreg[:, k]).sum(axis=0) / y_test.shape[0]
-    )
-    # OR ALTERNATIVELY: you can use sklearn.linear_model module for linear regression:
-    # m = lm.LinearRegression().fit(X_train, y_train)
-    # Error_train[k] = np.square(y_train-m.predict(X_train)).sum()/y_train.shape[0]
-    # Error_test[k] = np.square(y_test-m.predict(X_test)).sum()/y_test.shape[0]
+# Preparing the data
+N, M = X.shape
 
-    # Display the results for the last cross-validation fold
-    if k == K - 1:
-        figure(k, figsize=(12, 8))
-        subplot(1, 2, 1)
-        semilogx(lambdas, mean_w_vs_lambda.T[:, 1:], ".-")  # Don't plot the bias term
-        xlabel("Regularization factor")
-        ylabel("Mean Coefficient Values")
-        grid()
-        # You can choose to display the legend, but it's omitted for a cleaner
-        # plot, since there are many attributes
-        legend(attributeNames[1:], loc='best')
+y = y.squeeze()
+# Add offset attribute
+X = np.concatenate((np.ones((X.shape[0], 1)), X), 1)
 
-        subplot(1, 2, 2)
-        title("Optimal lambda: 1e{0}".format(np.log10(opt_lambda)))
-        loglog(
-            lambdas, train_err_vs_lambda.T, "b.-", lambdas, test_err_vs_lambda.T, "r.-"
-        )
-        xlabel("Regularization factor")
-        ylabel("Squared error (crossvalidation)")
-        legend(["Train error", "Validation error"])
-        grid()
+attributeNames = ["Offset"] + attributeNames
+M = M + 1
 
-    # To inspect the used indices, use these print statements
-    # print('Cross validation fold {0}/{1}:'.format(k+1,K))
-    # print('Train indices: {0}'.format(train_index))
-    # print('Test indices: {0}\n'.format(test_index))
 
-    k += 1
+# Calculating baseline - mean(y)
+baseline = np.mean(y)
 
-show()
-# Display results
-print("Linear regression without feature selection:")
-print("- Training error: {0}".format(Error_train.mean()))
-print("- Test error:     {0}".format(Error_test.mean()))
-print(
-    "- R^2 train:     {0}".format(
-        (Error_train_nofeatures.sum() - Error_train.sum())
-        / Error_train_nofeatures.sum()
-    )
-)
-print(
-    "- R^2 test:     {0}\n".format(
-        (Error_test_nofeatures.sum() - Error_test.sum()) / Error_test_nofeatures.sum()
-    )
-)
-print("Regularized linear regression:")
-print("- Training error: {0}".format(Error_train_rlr.mean()))
-print("- Test error:     {0}".format(Error_test_rlr.mean()))
-print(
-    "- R^2 train:     {0}".format(
-        (Error_train_nofeatures.sum() - Error_train_rlr.sum())
-        / Error_train_nofeatures.sum()
-    )
-)
-print(
-    "- R^2 test:     {0}\n".format(
-        (Error_test_nofeatures.sum() - Error_test_rlr.sum())
-        / Error_test_nofeatures.sum()
-    )
-)
+K1 = K2 = 10
 
-print("Weights in last fold:")
-for m in range(M):
-    print("{:>15} {:>15}".format(attributeNames[m], np.round(w_rlr[m, -1], 2)))
+CV = model_selection.KFold(K1, shuffle=True)
 
-print("Ran Exercise 8.1.1")
+# Values of lambda
+lambdas = np.power(10.0, range(-5, 9))
+
+# Values of lambda
+hidden = list(range(1, 10))
+
+# Define outer CV
+outer_cv = KFold(n_splits=K1, shuffle=True)
+inner_cv = KFold(n_splits=K2, shuffle=True)
+
+k_outer = 1
+# Modify the main loop to use the train_regression function
+for train_outer_index, test_outer_index in outer_cv.split(X, y):
+    X_train_outer = X[train_outer_index]
+    y_train_outer = y[train_outer_index]
+    X_test_outer = X[test_outer_index]
+    y_test_outer = y[test_outer_index]
+
+    best_error_ANN = float('inf')
+    best_error_Reg = float('inf')
+    best_hidden_units = None
+    best_lambda = None
+
+    k_inner = 1
+    for train_inner_index, test_inner_index in inner_cv.split(X_train_outer, y_train_outer):
+        X_train_inner = X_train_outer[train_inner_index]
+        y_train_inner = y_train_outer[train_inner_index]
+        X_test_inner = X_train_outer[test_inner_index]
+        y_test_inner = y_train_outer[test_inner_index]
+
+        # # Train ANN
+        # h, E_ann = train_ANN(hidden, y_train_outer, train_inner_index, test_inner_index)
+
+        # # Train logistic regression
+        # E_log_reg = train_regression(X_train_inner, y_train_inner, X_test_inner, y_test_inner)
+
+        # if E_log_reg < best_error_Reg:
+        #     best_error_Reg = E_log_reg
+
+        # if E_ann < best_error_ANN:
+        #     best_error_ANN = E_ann
+        #     best_hidden_units = h
+
+        k_inner += 1
+
+    # Train models on the optimal hyperparameters
+    # _, outer_fold_ann_error = train_ANN([best_hidden_units], y, train_outer_index, test_outer_index)
+    # outer_fold_reg_error = train_regression(X_train_outer, y_train_outer, X_test_outer, y_test_outer)
+
+    # Compute baseline error
+    baseline_error_outer = baseline_error(y_train_outer, y_test_outer)
+
+    # Print results for the outer fold
+    print(f"Outer Fold Nr. {k_outer}")
+    # print(f"ANN: h = {best_hidden_units}, error = {outer_fold_ann_error}")
+    # print(f"Logistic Regression: error = {outer_fold_reg_error}")
+    print(f"Baseline: {baseline_error_outer}")
+
+    k_outer += 1

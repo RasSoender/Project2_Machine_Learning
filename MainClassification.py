@@ -80,24 +80,17 @@ attributeNames[2] = "Blood Glucose"
 attributeNames[3] = "Oral"
 attributeNames[4] = "Insulin Levels"
 
-# Taking active attribute as the target variable
-y = X[:, 6].reshape(-1, 1)
+# Taking active and not active combining into one attribute as the target variable
+# Check if column 6 is 1, set y to 1 for that row
+y[X[:, 7] == 1] = 1
 
-# Removing the active attribute from the features
-X = np.delete(X, 6, axis=1)
+# Check if column 7 is 1, set y to 0 for that row
+y[X[:, 8] == 1] = 0
+
+
+# Removing the active and not active attribute from the features
+X = np.delete(X, [7, 8], axis=1)
+
 
 # Define the attribute names again for plotting
-attributeNames = ["Age", "BMI", "Blood Glucose", "Oral", "Male", "Female", "Active", "Not Active", "Diabetic", "Not Diabetic", "Borderline Diabetic"]
-coefficient = [-2.39, 5.36, 0.3, 1.5, 0.25, -0.25, -0.18, 0.18, -0.17, -0.18, 0.32]
-
-# Method to show the coefficients of the attributes
-def coefficient_directions():
-    plt.figure(figsize=(10, 6))
-    colors = ['red' if coef < 0 else 'blue' for coef in coefficient]
-    plt.bar(attributeNames, coefficient, color=colors)
-    plt.title('Coefficients of Attributes')
-    plt.xlabel('Attributes')
-    plt.ylabel('Coefficients')
-    plt.xticks(rotation=70, ha='right')
-    plt.tight_layout()
-    plt.show()
+attributeNames = ["Age", "BMI", "Blood Glucose", "Oral", "Insulin Levels", "Male", "Female", "Diabetic", "Not Diabetic", "Borderline Diabetic"]
