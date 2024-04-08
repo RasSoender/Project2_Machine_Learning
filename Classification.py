@@ -10,13 +10,17 @@ def baseline_error(baseline, y_test):
     numb_1 = np.count_nonzero(baseline == 1)
     print(numb_0)
     print(numb_1)
-    class_predict = max(numb_0, numb_1)
+    
+    # Determine the majority class in y_test by taking the sum of y_test and comparing it to the number of elements in y_test
+    class_predict = 0 if np.sum(y_test) > y_test.shape[0] / 2 else 1
+    
     for i in y_test:
         if i != class_predict:
             error += 1
     print(y_test.shape[0])
-    print(error/y_test.shape[0])
-    return error/y_test.shape[0]
+    print(error / y_test.shape[0])
+    return error / y_test.shape[0]
+
 
 def train_ANN(hidden, y, train_index, test_index):
     y = y.reshape(-1, 1)
