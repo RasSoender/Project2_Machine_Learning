@@ -16,7 +16,7 @@ def train_ANN(hidden, y):
     for h in hidden: 
         model = lambda: torch.nn.Sequential(
             torch.nn.Linear(M, h),  # M features to n_hidden_units
-            torch.nn.Tanh(),  # 1st transfer function,
+            torch.nn.ReLU(),  # 1st transfer function,
             torch.nn.Linear(h, 1),  # n_hidden_units to 1 output neuron
             # no final tranfer function, i.e. "linear output"
         )
@@ -26,7 +26,7 @@ def train_ANN(hidden, y):
         y_train = torch.Tensor(y[train_index])
         X_test = torch.Tensor(X[test_index, :])
         y_test = torch.Tensor(y[test_index])
-        max_iter = 1000
+        max_iter = 10000
         n_replicates = 1
         # Train the net on training data
         net, _, _ = train_neural_net(
