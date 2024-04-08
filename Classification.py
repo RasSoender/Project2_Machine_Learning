@@ -1,14 +1,26 @@
-from Main import *
+from MainClassification import *
 import torch
 from sklearn.model_selection import KFold
 from sklearn import model_selection
 from dtuimldmtools import rlr_validate, train_neural_net
 
 def baseline_error(baseline, y_test):
-    error = (
-        np.square(y_test - baseline).sum(axis=0) / y_test.shape[0]
-    )
-    return error
+    error = 0
+    numb_0 = np.count_nonzero(baseline == 0)
+    numb_1 = np.count_nonzero(baseline == 1)
+    print(numb_0)
+    print(numb_1)
+    
+    # Determine the majority class in y_test by taking the sum of y_test and comparing it to the number of elements in y_test
+    class_predict = 0 if np.sum(y_test) > y_test.shape[0] / 2 else 1
+    
+    for i in y_test:
+        if i != class_predict:
+            error += 1
+    print(y_test.shape[0])
+    print(error / y_test.shape[0])
+    return error / y_test.shape[0]
+
 
 def train_ANN(hidden, y, train_index, test_index):
     y = y.reshape(-1, 1)
@@ -18,9 +30,9 @@ def train_ANN(hidden, y, train_index, test_index):
             torch.nn.Linear(M, h),  # M features to n_hidden_units
             torch.nn.ReLU(),  # 1st transfer function,
             torch.nn.Linear(h, 1),  # n_hidden_units to 1 output neuron
-            # no final tranfer function, i.e. "linear output"
+            torch.nn.Sigmoid()  # Sigmoid activation for binary classification
         )
-        loss_fn = torch.nn.MSELoss()  # notice how this is now a mean-squared-error loss
+        loss_fn = torch.nn.BCELoss()  # Binary Cross-Entropy Loss
         # Extract training and test set for current CV fold, convert to tensors
         X_train = torch.Tensor(X[train_index, :])
         y_train = torch.Tensor(y[train_index])
@@ -38,16 +50,16 @@ def train_ANN(hidden, y, train_index, test_index):
             max_iter=max_iter,
         )
         # Determine estimated class labels for test set
-        y_test_est = net(X_test)
+        y_test_est = (net(X_test) > 0.5).float()  # Threshold at 0.5 for binary classification
 
-        # Determine errors and errors
-        se = (y_test_est.float() - y_test.float()) ** 2  # squared error
-        mse = (sum(se).type(torch.float) / len(y_test)).data.numpy()  # mean
-        errors.append(mse)
+        # Determine accuracy as the evaluation metric
+        accuracy = (y_test_est == y_test).float().mean().data.numpy()
+        errors.append(1 - accuracy)  # Error is 1 - accuracy for binary classification
     min_error = min(errors)
     h = errors.index(min_error)
 
     return h, min_error
+
 
 def train_regression(lambdas, X_train, y_train, X_test, y_test):
     """
@@ -125,6 +137,7 @@ outer_cv = KFold(n_splits=K1, shuffle=True)
 inner_cv = KFold(n_splits=K2, shuffle=True)
 
 k_outer = 1
+# Modify the main loop to use the train_regression function
 for train_outer_index, test_outer_index in outer_cv.split(X, y):
     X_train_outer = X[train_outer_index]
     y_train_outer = y[train_outer_index]
@@ -143,33 +156,32 @@ for train_outer_index, test_outer_index in outer_cv.split(X, y):
         X_test_inner = X_train_outer[test_inner_index]
         y_test_inner = y_train_outer[test_inner_index]
 
-        # Train ANN
-        h, E_ann = train_ANN(hidden, y_train_outer, train_inner_index, test_inner_index)
+        # # Train ANN
+        # h, E_ann = train_ANN(hidden, y_train_outer, train_inner_index, test_inner_index)
 
-        # Train regression
-        opt_lamb, E_lamb = train_regression(lambdas, X_train_inner, y_train_inner, X_test_inner, y_test_inner)
+        # # Train logistic regression
+        # E_log_reg = train_regression(X_train_inner, y_train_inner, X_test_inner, y_test_inner)
 
-        if E_lamb < best_error_Reg:
-            best_error_Reg = E_lamb
-            best_lambda = opt_lamb
+        # if E_log_reg < best_error_Reg:
+        #     best_error_Reg = E_log_reg
 
-        if E_ann < best_error_ANN:
-            best_error_ANN = E_ann
-            best_hidden_units = h
+        # if E_ann < best_error_ANN:
+        #     best_error_ANN = E_ann
+        #     best_hidden_units = h
 
         k_inner += 1
 
     # Train models on the optimal hyperparameters
-    _, outer_fold_ann_error = train_ANN([best_hidden_units], y, train_outer_index, test_outer_index)
-    _, outer_fold_reg_error = train_regression([best_lambda], X_train_outer, y_train_outer, X_test_outer, y_test_outer)
+    # _, outer_fold_ann_error = train_ANN([best_hidden_units], y, train_outer_index, test_outer_index)
+    # outer_fold_reg_error = train_regression(X_train_outer, y_train_outer, X_test_outer, y_test_outer)
 
     # Compute baseline error
-    baseline_error_outer = baseline_error(np.mean(y_train_outer), y_test_outer)
+    baseline_error_outer = baseline_error(y_train_outer, y_test_outer)
 
     # Print results for the outer fold
     print(f"Outer Fold Nr. {k_outer}")
-    print(f"ANN: h = {best_hidden_units}, error = {outer_fold_ann_error}")
-    print(f"Regression: lambda = {best_lambda}, error = {outer_fold_reg_error}")
+    # print(f"ANN: h = {best_hidden_units}, error = {outer_fold_ann_error}")
+    # print(f"Logistic Regression: error = {outer_fold_reg_error}")
     print(f"Baseline: {baseline_error_outer}")
 
     k_outer += 1
