@@ -1,5 +1,6 @@
 from Main import *
 import torch
+from sklearn.model_selection import KFold
 from sklearn import model_selection
 from dtuimldmtools import rlr_validate, train_neural_net
 
@@ -9,9 +10,8 @@ def baseline_error(baseline, y_test):
     )
     return error
 
-def train_ANN(hidden, y):
+def train_ANN(hidden, y, train_index, test_index):
     y = y.reshape(-1, 1)
-
     errors = []
     for h in hidden: 
         model = lambda: torch.nn.Sequential(
@@ -49,7 +49,7 @@ def train_ANN(hidden, y):
 
     return h, min_error
 
-def train_regression(X_train, y_train, X_test, y_test):
+def train_regression(lambdas, X_train, y_train, X_test, y_test):
     """
     training and testing the model for linear regression
     """
@@ -121,21 +121,56 @@ lambdas = np.power(10.0, range(-5, 9))
 # Values of lambda
 hidden = list(range(1, 10))
 
-k = 1
-for train_index, test_index in CV.split(X, y):
-    # extract training and test set for current CV fold
-    X_train = X[train_index]
-    y_train = y[train_index]
-    X_test = X[test_index]
-    y_test = y[test_index]
-    
-    h, E_ann = train_ANN(hidden, y)
-    opt_lamb, E_lamb = train_regression(X_train, y_train, X_test, y_test)
-    E_baseline = baseline_error(baseline, y_test)
+# Define outer CV
+outer_cv = KFold(n_splits=K1, shuffle=True)
+inner_cv = KFold(n_splits=K2, shuffle=True)
 
-    print(f"Fold Nr. {k}")
-    print(f"h = {h}, error = {E_ann}")
-    print(f"lamb = {opt_lamb}, error = {E_lamb}")
-    print(f"baseline = {E_baseline}")
+k_outer = 1
+for train_outer_index, test_outer_index in outer_cv.split(X, y):
+    X_train_outer = X[train_outer_index]
+    y_train_outer = y[train_outer_index]
+    X_test_outer = X[test_outer_index]
+    y_test_outer = y[test_outer_index]
 
-    k += 1
+    best_error_ANN = float('inf')
+    best_error_Reg = float('inf')
+    best_hidden_units = None
+    best_lambda = None
+
+    k_inner = 1
+    for train_inner_index, test_inner_index in inner_cv.split(X_train_outer, y_train_outer):
+        X_train_inner = X_train_outer[train_inner_index]
+        y_train_inner = y_train_outer[train_inner_index]
+        X_test_inner = X_train_outer[test_inner_index]
+        y_test_inner = y_train_outer[test_inner_index]
+
+        # Train ANN
+        h, E_ann = train_ANN(hidden, y_train_outer, train_inner_index, test_inner_index)
+
+        # Train regression
+        opt_lamb, E_lamb = train_regression(lambdas, X_train_inner, y_train_inner, X_test_inner, y_test_inner)
+
+        if E_lamb < best_error_Reg:
+            best_error_Reg = E_lamb
+            best_lambda = opt_lamb
+
+        if E_ann < best_error_ANN:
+            best_error_ANN = E_ann
+            best_hidden_units = h
+
+        k_inner += 1
+
+    # Train models on the optimal hyperparameters
+    _, outer_fold_ann_error = train_ANN([best_hidden_units], y, train_outer_index, test_outer_index)
+    _, outer_fold_reg_error = train_regression([best_lambda], X_train_outer, y_train_outer, X_test_outer, y_test_outer)
+
+    # Compute baseline error
+    baseline_error_outer = baseline_error(np.mean(y_train_outer), y_test_outer)
+
+    # Print results for the outer fold
+    print(f"Outer Fold Nr. {k_outer}")
+    print(f"ANN: h = {best_hidden_units}, error = {outer_fold_ann_error}")
+    print(f"Regression: lambda = {best_lambda}, error = {outer_fold_reg_error}")
+    print(f"Baseline: {baseline_error_outer}")
+
+    k_outer += 1
