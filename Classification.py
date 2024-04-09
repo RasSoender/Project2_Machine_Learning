@@ -47,7 +47,7 @@ def train_regression(lambda_interval, X_train, y_train, X_test, y_test):
 
     train_error_rate = np.zeros(len(lambda_interval))
     test_error_rate = np.zeros(len(lambda_interval))
-    coefficient_norm = np.zeros(len(lambda_interval))
+    
     for k in range(0, len(lambda_interval)):
         mdl = LogisticRegression(penalty="l2", C=1 / lambda_interval[k])
 
@@ -58,9 +58,7 @@ def train_regression(lambda_interval, X_train, y_train, X_test, y_test):
 
         train_error_rate[k] = np.sum(y_train_est != y_train) / len(y_train)
         test_error_rate[k] = np.sum(y_test_est != y_test) / len(y_test)
-
-        w_est = mdl.coef_[0]
-        coefficient_norm[k] = np.sqrt(np.sum(w_est**2))
+        #print(f"test_error = {test_error_rate[k]} - lambda = {lambda_interval[k]}")
 
     min_error = np.min(test_error_rate)
     opt_lambda_idx = np.argmin(test_error_rate)
@@ -73,24 +71,14 @@ N, M = X.shape
 
 y = y.squeeze()
 # Add offset attribute
-X = np.concatenate((np.ones((X.shape[0], 1)), X), 1)
 
-attributeNames = ["Offset"] + attributeNames
-M = M + 1
-
-
-# Calculating baseline - mean(y)
-baseline = np.mean(y)
 
 K1 = K2 = 10
 
 CV = model_selection.KFold(K1, shuffle=True)
 
 # Values of lambda
-lambdas = np.power(10.0, range(-5, 9))
-
-# Values of lambda
-hidden = list(range(1, 10))
+lambdas = np.logspace(-10, 9, 50)
 
 neighbors = list(range(1,20))
 

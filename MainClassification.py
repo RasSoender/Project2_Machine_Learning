@@ -82,15 +82,18 @@ attributeNames[4] = "Insulin Levels"
 
 # Taking active and not active combining into one attribute as the target variable
 # Check if column 6 is 1, set y to 1 for that row
-y[X[:, 7] == 1] = 1
+
+median = np.median(X[:,4])
+
+y[X[:, 4] > median] = 1
 
 # Check if column 7 is 1, set y to 0 for that row
-y[X[:, 8] == 1] = 0
+y[X[:, 4] <= median] = 0
 
 
 # Removing the active and not active attribute from the features
-X = np.delete(X, [7, 8], axis=1)
+X = np.delete(X, 4, axis=1)
 
 
 # Define the attribute names again for plotting
-attributeNames = ["Age", "BMI", "Blood Glucose", "Oral", "Insulin Levels", "Male", "Female", "Diabetic", "Not Diabetic", "Borderline Diabetic"]
+attributeNames = ["Age", "BMI", "Blood Glucose", "Oral", "Male", "Female","Active", "Not Active", "Diabetic", "Not Diabetic", "Borderline Diabetic"]
