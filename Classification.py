@@ -7,10 +7,6 @@ from dtuimldmtools import rlr_validate, train_neural_net
 
 def baseline_error(baseline, y_test):
     error = 0
-    numb_0 = np.count_nonzero(baseline == 0)
-    numb_1 = np.count_nonzero(baseline == 1)
-    print(numb_0)
-    print(numb_1)
     
     # Determine the majority class in y_test by taking the sum of y_test and comparing it to the number of elements in y_test
     class_predict = 1 if np.sum(y_test) > (y_test.shape[0] / 2) else 0
@@ -18,8 +14,6 @@ def baseline_error(baseline, y_test):
     for i in y_test:
         if i != class_predict:
             error += 1
-    print(y_test.shape[0])
-    print(error / y_test.shape[0])
     return error / y_test.shape[0]
 
 
@@ -66,15 +60,12 @@ def train_regression(lambda_interval, X_train, y_train, X_test, y_test):
     """
     training and testing the model for linear regression
     """
+
     mu = np.mean(X_train, 0)
-    sigma = np.std(X_train, 0)
+    sigma = np.std(X_train, ddof=0)
 
     X_train = (X_train - mu) / sigma
     X_test = (X_test - mu) / sigma
-
-    # Fit regularized logistic regression model to training data to predict
-    # the type of wine
-    
 
     train_error_rate = np.zeros(len(lambda_interval))
     test_error_rate = np.zeros(len(lambda_interval))
@@ -165,7 +156,7 @@ for train_outer_index, test_outer_index in outer_cv.split(X, y):
 
     # Train models on the optimal hyperparameters
     # _, outer_fold_ann_error = train_ANN([best_hidden_units], y, train_outer_index, test_outer_index)
-    outer_fold_reg_error = train_regression([best_lambda], X_train_outer, y_train_outer, X_test_outer, y_test_outer)
+    _, outer_fold_reg_error = train_regression([best_lambda], X_train_outer, y_train_outer, X_test_outer, y_test_outer)
 
     # Compute baseline error
     baseline_error_outer = baseline_error(y_train_outer, y_test_outer)
@@ -173,7 +164,7 @@ for train_outer_index, test_outer_index in outer_cv.split(X, y):
     # Print results for the outer fold
     print(f"Outer Fold Nr. {k_outer}")
     # print(f"ANN: h = {best_hidden_units}, error = {outer_fold_ann_error}")
-    print(f"Logistic Regression: error = {outer_fold_reg_error}")
+    print(f"Regression: lambda = {best_lambda}, error = {outer_fold_reg_error}")
     print(f"Baseline: {baseline_error_outer}")
 
     k_outer += 1
