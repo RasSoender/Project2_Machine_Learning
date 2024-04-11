@@ -132,9 +132,10 @@ for train_index, test_index in CV.split(X, y):
         loglog(
             lambdas, train_err_vs_lambda.T, "b.-", lambdas, test_err_vs_lambda.T, "r.-"
         )
+        semilogx(opt_lambda, opt_val_err, "o", color="green", markersize=8)
         xlabel("Regularization factor")
         ylabel("Squared error (crossvalidation)")
-        legend(["Train error", "Validation error"])
+        legend(["Train error", "Validation error"] + ["Test minimum"])
         grid()
 
     # To inspect the used indices, use these print statements

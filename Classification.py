@@ -72,7 +72,6 @@ N, M = X.shape
 y = y.squeeze()
 # Add offset attribute
 
-
 K1 = K2 = 10
 
 CV = model_selection.KFold(K1, shuffle=True)
